@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="שעות">
+<meta name="theme-color" content="#f2f2f7">
+<link rel="manifest" href="./manifest.json">
+<title>מעקב שעות עבודה</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface2: #f2f2f7;
+  --border: #d1d1d6;
+  --accent: #3B82F6;
+  --green: #34C759;
+  --red: #FF3B30;
+  --yellow: #FF9F0A;
+  --text: #1c1c1e;
+  --text2: #6c6c70;
+  --text3: #aeaeb2;
+  --nav-h: 60px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* ===== LAYOUT ===== */
+#app {
+  max-width: 430px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.screen {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 16px calc(var(--nav-h) + var(--safe-bottom) + 16px);
+}
+.screen.active { display: block; }
+
+/* ===== TOP BAR ===== */
+.topbar {
+  padding: 16px 16px 8px;
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.topbar h1 { font-size: 28px; font-weight: 700; }
+.topbar .subtitle { color: var(--text2); font-size: 14px; margin-top: 2px; }
+
+/* ===== BOTTOM NAV ===== */
+#bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  height: calc(var(--nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 100;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  color: var(--text3);
+  font-size: 10px;
+  padding: 8px 0;
+  transition: color 0.15s;
+  border: none;
+  background: none;
+}
+.nav-item.active { color: var(--accent); }
+.nav-item svg { width: 24px; height: 24px; }
+
+/* ===== CARDS ===== */
+.card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* ===== STATS ROW ===== */
+.stats-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.stat-box {
+  flex: 1;
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 14px 12px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.stat-box .val {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.stat-box .lbl { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+/* ===== PROGRESS BAR ===== */
+.progress-track {
+  background: var(--surface2);
+  border-radius: 4px;
+  height: 6px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+.progress-fill.green { background: var(--green); }
+
+/* ===== BUTTON ===== */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 15px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn:active { opacity: 0.8; transform: scale(0.98); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-success { background: var(--green); color: #fff; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-secondary { background: #e5e5ea; color: var(--text); }
+.btn-sm {
+  width: auto;
+  padding: 7px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+/* ===== FORM ELEMENTS ===== */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.form-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 16px;
+  font-family: inherit;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text3); }
+
+textarea.form-input {
+  resize: none;
+  min-height: 80px;
+}
+
+select.form-input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238e8e93' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+  padding-left: 36px;
+}
+
+/* ===== TOGGLE TABS ===== */
+.seg-ctrl {
+  display: flex;
+  background: #e5e5ea;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 8px;
+  text-align: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  border: none;
+  background: none;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.seg-btn.active {
+  background: #ffffff;
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+/* ===== TIME ROW ===== */
+.time-row { display: flex; gap: 10px; align-items: flex-end; }
+.time-row .form-group { flex: 1; margin-bottom: 0; }
+
+/* ===== LIST ITEMS ===== */
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.list-item-body { flex: 1; min-width: 0; }
+.list-item-title { font-size: 15px; font-weight: 600; }
+.list-item-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.list-item-right { text-align: left; flex-shrink: 0; }
+.list-item-value { font-size: 16px; font-weight: 700; }
+.list-item-lbl { font-size: 11px; color: var(--text2); }
+
+.job-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ===== JOB CHIP SELECTOR ===== */
+.job-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.job-chip {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.job-chip.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(59,130,246,0.1);
+}
+
+/* ===== DAY CHIPS (reminders) ===== */
+.day-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.day-chip {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.day-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(59,130,246,0.15);
+}
+
+/* ===== BANNER ===== */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.banner.info { background: rgba(59,130,246,0.15); color: #93C5FD; border: 1px solid rgba(59,130,246,0.3); }
+.banner.warning { background: rgba(255,159,10,0.15); color: #FCD34D; border: 1px solid rgba(255,159,10,0.3); }
+.banner.success { background: rgba(52,199,89,0.15); color: #6EE7B7; border: 1px solid rgba(52,199,89,0.3); }
+.banner svg { flex-shrink: 0; }
+
+/* ===== BOTTOM SHEET ===== */
+#overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+}
+#overlay.open { display: block; }
+
+#sheet {
+  position: fixed;
+  bottom: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px calc(20px + var(--safe-bottom));
+  z-index: 300;
+  transition: bottom 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+#sheet.open { bottom: 0; }
+
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+.sheet-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+/* ===== DIVIDER ===== */
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* ===== EMPTY STATE ===== */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text2);
+}
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty h3 { font-size: 17px; color: var(--text); margin-bottom: 6px; }
+
+/* ===== MONTH HEADER ===== */
+.month-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  padding: 8px 0 6px;
+  letter-spacing: 0.3px;
+}
+
+/* ===== ACTION BUTTONS ROW ===== */
+.action-row { display: flex; gap: 8px; }
+.action-row .btn { flex: 1; }
+
+/* ===== TOGGLE ===== */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.toggle-label { font-size: 15px; }
+.toggle {
+  position: relative;
+  width: 50px;
+  height: 28px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--surface2);
+  border-radius: 28px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.toggle-slider { background: #e5e5ea; }
+.toggle input:checked + .toggle-slider { background: var(--green); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
+
+/* ===== SECTION HEADER ===== */
+.section-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.section-hdr h2 { font-size: 17px; font-weight: 600; }
+.section-hdr .add-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ===== PREDICTION SECTION ===== */
+.prediction-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.prediction-amount {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--green);
+}
+.prediction-label { font-size: 13px; color: var(--text2); }
+
+/* ===== PAYSLIP COMPONENTS ===== */
+.comp-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.comp-row:last-child { border-bottom: none; }
+
+/* ===== DELETE BUTTON ===== */
+.del-btn {
+  background: none;
+  border: none;
+  color: var(--red);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-family: inherit;
+  gap: 4px;
+}
+
+/* ===== HISTORY WEEK ===== */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.week-day .wd-name { font-size: 10px; color: var(--text2); }
+.week-day .wd-bar-wrap {
+  width: 28px;
+  height: 60px;
+  background: var(--surface2);
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.week-day .wd-bar {
+  width: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+  transition: height 0.3s ease;
+}
+.week-day .wd-h { font-size: 10px; color: var(--text2); }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 0; }
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.card, .list-item, .stat-box { animation: fadeIn 0.2s ease; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME SCREEN -->
+  <div id="screen-home" class="screen active">
+    <div class="topbar">
+      <h1>שלום 👋</h1>
+      <div class="subtitle" id="home-date"></div>
+    </div>
+    <div id="home-content"></div>
+  </div>
+
+  <!-- LOG SCREEN -->
+  <div id="screen-log" class="screen">
+    <div class="topbar">
+      <h1>רישום שעות</h1>
+    </div>
+    <div id="log-content"></div>
+  </div>
+
+  <!-- HISTORY SCREEN -->
+  <div id="screen-history" class="screen">
+    <div class="topbar">
+      <h1>היסטוריה</h1>
+    </div>
+    <div id="history-content"></div>
+  </div>
+
+  <!-- SETTINGS SCREEN -->
+  <div id="screen-settings" class="screen">
+    <div class="topbar">
+      <h1>הגדרות</h1>
+    </div>
+    <div id="settings-content"></div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav id="bottom-nav">
+    <button class="nav-item active" data-screen="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      בית
+    </button>
+    <button class="nav-item" data-screen="log">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      רישום
+    </button>
+    <button class="nav-item" data-screen="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      היסטוריה
+    </button>
+    <button class="nav-item" data-screen="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      הגדרות
+    </button>
+  </nav>
+
+</div>
+
+<!-- OVERLAY + BOTTOM SHEET -->
+<div id="overlay"></div>
+<div id="sheet">
+  <div class="sheet-handle"></div>
+  <div id="sheet-body"></div>
+</div>
+
+<script>
+// ============================================================
+// DATA LAYER
+// ============================================================
+const DB = {
+  _get(key) {
+    try { return JSON.parse(localStorage.getItem('wt_' + key)) || []; } catch { return []; }
+  },
+  _set(key, val) {
+    localStorage.setItem('wt_' + key, JSON.stringify(val));
+  },
+
+  jobs: {
+    all() { return DB._get('jobs'); },
+    add(j) { const a = DB.jobs.all(); a.push(j); DB._set('jobs', a); },
+    update(j) { DB._set('jobs', DB.jobs.all().map(x => x.id === j.id ? j : x)); },
+    del(id) { DB._set('jobs', DB.jobs.all().filter(x => x.id !== id)); },
+    find(id) { return DB.jobs.all().find(x => x.id === id); }
+  },
+
+  logs: {
+    all() { return DB._get('logs'); },
+    add(l) { const a = DB.logs.all(); a.push(l); DB._set('logs', a); },
+    update(l) { DB._set('logs', DB.logs.all().map(x => x.id === l.id ? l : x)); },
+    del(id) { DB._set('logs', DB.logs.all().filter(x => x.id !== id)); },
+    forDate(date) { return DB.logs.all().filter(l => l.date === date); },
+    forMonth(y, m) {
+      return DB.logs.all().filter(l => {
+        const d = new Date(l.date + 'T12:00:00');
+        return d.getFullYear() === y && d.getMonth() === m;
+      });
+    },
+    forWeek(startDate) {
+      const start = new Date(startDate + 'T00:00:00');
+      const end = new Date(start); end.setDate(end.getDate() + 6);
+      return DB.logs.all().filter(l => {
+        const d = new Date(l.date + 'T12:00:00');
+        return d >= start && d <= end;
+      });
+    }
+  },
+
+  payslips: {
+    all() { return DB._get('payslips'); },
+    add(p) { const a = DB.payslips.all(); a.push(p); DB._set('payslips', a); },
+    del(id) { DB._set('payslips', DB.payslips.all().filter(x => x.id !== id)); },
+    forJob(jobId) { return DB.payslips.all().filter(p => p.jobId === jobId); }
+  },
+
+  settings: {
+    get() {
+      try {
+        return JSON.parse(localStorage.getItem('wt_settings')) || {
+          reminderEnabled: false, reminderTime: '20:00', reminderDays: [0,1,2,3,4]
+        };
+      } catch {
+        return { reminderEnabled: false, reminderTime: '20:00', reminderDays: [0,1,2,3,4] };
+      }
+    },
+    set(s) { localStorage.setItem('wt_settings', JSON.stringify(s)); }
+  }
+};
+
+// ============================================================
+// UTILS
+// ============================================================
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+function calcHours(start, end) {
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const mins = (eh * 60 + em) - (sh * 60 + sm);
+  return Math.max(0, mins / 60);
+}
+
+function fmtHours(h) {
+  if (!h || h === 0) return '0';
+  const hrs = Math.floor(h);
+  const mins = Math.round((h - hrs) * 60);
+  if (mins === 0) return `${hrs}`;
+  return `${hrs}:${String(mins).padStart(2, '0')}`;
+}
+
+function fmtHoursFull(h) {
+  if (!h || h === 0) return '0 שעות';
+  const hrs = Math.floor(h);
+  const mins = Math.round((h - hrs) * 60);
+  let s = hrs > 0 ? `${hrs} שע'` : '';
+  if (mins > 0) s += (s ? ' ' : '') + `${mins} דק'`;
+  return s;
+}
+
+function fmtMoney(n) {
+  if (!n && n !== 0) return '—';
+  return '₪' + Math.round(n).toLocaleString('he-IL');
+}
+
+const DAYS_HE = ['א','ב','ג','ד','ה','ו','ש'];
+const DAYS_FULL = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+
+function fmtDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `יום ${DAYS_FULL[d.getDay()]}, ${d.getDate()} ב${MONTHS_HE[d.getMonth()]}`;
+}
+
+function fmtDateShort(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${d.getDate()}/${d.getMonth()+1}`;
+}
+
+function getWeekStart(date) {
+  const d = new Date(date + 'T12:00:00');
+  const day = d.getDay(); // 0=Sun
+  d.setDate(d.getDate() - day);
+  return d.toISOString().split('T')[0];
+}
+
+function JOB_COLORS() {
+  return ['#3B82F6','#34C759','#FF9F0A','#AF52DE','#FF3B30','#00C7BE','#FF2D55'];
+}
+
+// ============================================================
+// PREDICTION ENGINE
+// ============================================================
+const Prediction = {
+  estimate(jobId) {
+    const job = DB.jobs.find(jobId);
+    if (!job) return null;
+
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const logs = DB.logs.forMonth(y, m).filter(l => l.jobId === jobId);
+    const totalHours = logs.reduce((s, l) => s + (l.totalHours || 0), 0);
+    const workDays = logs.length;
+
+    const hoursWage = totalHours * (job.hourlyRate || 0);
+    const travel = workDays * (job.travelAllowance || 0);
+    const grossExpected = hoursWage + travel;
+
+    const payslips = DB.payslips.forJob(jobId).filter(p => p.grossAmount > 0);
+    const netRatio = payslips.length > 0
+      ? payslips.reduce((s, p) => s + (p.netAmount / p.grossAmount), 0) / payslips.length
+      : 0.72;
+
+    const netExpected = grossExpected * netRatio;
+
+    // Days in month for projection
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    const projectedNet = dayOfMonth > 0 ? (netExpected / dayOfMonth) * daysInMonth : netExpected;
+
+    return { totalHours, workDays, grossExpected, netExpected, netRatio, projectedNet };
+  }
+};
+
+// ============================================================
+// SHEET (BOTTOM SHEET)
+// ============================================================
+const Sheet = {
+  open(title, html, onSubmit) {
+    document.getElementById('sheet-body').innerHTML =
+      `<div class="sheet-title">${title}</div>${html}`;
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('sheet').classList.add('open');
+    if (onSubmit) {
+      const form = document.getElementById('sheet-body').querySelector('form');
+      if (form) form.addEventListener('submit', e => { e.preventDefault(); onSubmit(form); });
+    }
+  },
+  close() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('sheet').classList.remove('open');
+  }
+};
+
+// ============================================================
+// ROUTER
+// ============================================================
+let _currentScreen = 'home';
+const Router = {
+  go(screen) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + screen).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n =>
+      n.classList.toggle('active', n.dataset.screen === screen)
+    );
+    _currentScreen = screen;
+    UI.render(screen);
+  }
+};
+
+// ============================================================
+// UI — HOME SCREEN
+// ============================================================
+function renderHome() {
+  const el = document.getElementById('home-content');
+  const dateEl = document.getElementById('home-date');
+  const now = new Date();
+  dateEl.textContent = `יום ${DAYS_FULL[now.getDay()]}, ${now.getDate()} ב${MONTHS_HE[now.getMonth()]} ${now.getFullYear()}`;
+
+  const today = todayStr();
+  const weekStart = getWeekStart(today);
+  const todayLogs = DB.logs.forDate(today);
+  const weekLogs = DB.logs.forWeek(weekStart);
+  const monthLogs = DB.logs.forMonth(now.getFullYear(), now.getMonth());
+
+  const todayH = todayLogs.reduce((s, l) => s + (l.totalHours || 0), 0);
+  const weekH = weekLogs.reduce((s, l) => s + (l.totalHours || 0), 0);
+  const monthH = monthLogs.reduce((s, l) => s + (l.totalHours || 0), 0);
+
+  const jobs = DB.jobs.all();
+  const settings = DB.settings.get();
+
+  // Reminder banner
+  let reminderBanner = '';
+  if (todayLogs.length === 0 && now.getHours() >= 14) {
+    reminderBanner = `<div class="banner warning">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>לא רשמת שעות היום עדיין</span>
+    </div>`;
+  }
+
+  // Stats
+  let statsHtml = `
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="val">${fmtHours(todayH)}</div>
+        <div class="lbl">שעות היום</div>
+      </div>
+      <div class="stat-box">
+        <div class="val">${fmtHours(weekH)}</div>
+        <div class="lbl">השבוע</div>
+      </div>
+      <div class="stat-box">
+        <div class="val">${fmtHours(monthH)}</div>
+        <div class="lbl">החודש</div>
+      </div>
+    </div>`;
+
+  // Predictions per job
+  let predictHtml = '';
+  if (jobs.length > 0) {
+    predictHtml = '<div class="card"><div class="card-title">תחזית משכורת — החודש</div>';
+    jobs.forEach(job => {
+      const p = Prediction.estimate(job.id);
+      if (!p) return;
+      const pct = Math.min(100, Math.round((now.getDate() / new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()) * 100));
+      predictHtml += `
+        <div style="margin-bottom:14px">
+          <div class="prediction-row">
+            <div>
+              <span class="job-dot" style="background:${job.color};display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px"></span>
+              <strong>${job.name}</strong>
+              <span style="font-size:12px;color:var(--text2);margin-right:6px">${p.totalHours > 0 ? fmtHoursFull(p.totalHours) : 'אין נתונים'}</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <div class="prediction-amount">${p.netExpected > 0 ? fmtMoney(p.projectedNet) : '—'}</div>
+            ${p.netExpected > 0 ? `<button onclick="showPredictionDetail('${job.id}')" style="background:none;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit">פירוט ?</button>` : ''}
+          </div>
+          <div class="prediction-label">
+            ${p.netExpected > 0 ? `נטו צפוי | ברוטו: ${fmtMoney(p.grossExpected)}` : 'הזן שכר שעתי בהגדרות'}
+          </div>
+          ${p.netExpected > 0 ? `
+          <div class="progress-track" style="margin-top:8px">
+            <div class="progress-fill green" style="width:${pct}%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">${pct}% מהחודש עבר</div>` : ''}
+        </div>`;
+    });
+    predictHtml += '</div>';
+  }
+
+  // No jobs state
+  let noJobsHtml = '';
+  if (jobs.length === 0) {
+    noJobsHtml = `<div class="card">
+      <div class="empty">
+        <div class="empty-icon">💼</div>
+        <h3>הוסף מקום עבודה</h3>
+        <p style="font-size:14px;margin-bottom:16px">כדי להתחיל לעקוב אחרי השעות</p>
+        <button class="btn btn-primary" onclick="Router.go('settings')">הוסף עכשיו</button>
+      </div>
+    </div>`;
+  }
+
+  // Quick log button
+  let quickBtn = '';
+  if (jobs.length > 0) {
+    quickBtn = `<button class="btn btn-primary" onclick="Router.go('log')" style="margin-bottom:12px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      רשום שעות עכשיו
+    </button>`;
+  }
+
+  el.innerHTML = reminderBanner + statsHtml + quickBtn + predictHtml + noJobsHtml;
+}
+
+// ============================================================
+// UI — LOG SCREEN
+// ============================================================
+let logState = {
+  jobId: null,
+  mode: 'time', // 'time' or 'manual'
+};
+
+function renderLog() {
+  const el = document.getElementById('log-content');
+  const jobs = DB.jobs.all();
+
+  if (jobs.length === 0) {
+    el.innerHTML = `<div class="card"><div class="empty">
+      <div class="empty-icon">💼</div>
+      <h3>אין מקומות עבודה</h3>
+      <p style="font-size:14px;margin-bottom:16px">הוסף מקום עבודה בהגדרות</p>
+      <button class="btn btn-primary" onclick="Router.go('settings')">הוסף</button>
+    </div></div>`;
+    return;
+  }
+
+  if (!logState.jobId || !jobs.find(j => j.id === logState.jobId)) {
+    logState.jobId = jobs[0].id;
+  }
+
+  const chipsHtml = jobs.map(j => `
+    <button class="job-chip ${j.id === logState.jobId ? 'selected' : ''}"
+      onclick="logState.jobId='${j.id}';renderLog()"
+      style="${j.id === logState.jobId ? `border-color:${j.color};color:${j.color};background:${j.color}22` : ''}">
+      ${j.name}
+    </button>`).join('');
+
+  const today = todayStr();
+
+  el.innerHTML = `
+    <div class="form-group">
+      <div class="form-label">מקום עבודה</div>
+      <div class="job-chips">${chipsHtml}</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="log-date">תאריך</label>
+      <input class="form-input" type="date" id="log-date" value="${today}">
+    </div>
+
+    <div class="seg-ctrl">
+      <button class="seg-btn ${logState.mode==='time'?'active':''}" onclick="logState.mode='time';renderLog()">שעת כניסה/יציאה</button>
+      <button class="seg-btn ${logState.mode==='manual'?'active':''}" onclick="logState.mode='manual';renderLog()">ידני</button>
+    </div>
+
+    ${logState.mode === 'time' ? `
+    <div class="time-row">
+      <div class="form-group">
+        <label class="form-label" for="log-start">כניסה</label>
+        <input class="form-input" type="time" id="log-start" value="08:00">
+      </div>
+      <div style="padding-bottom:12px;color:var(--text2);font-size:20px">—</div>
+      <div class="form-group">
+        <label class="form-label" for="log-end">יציאה</label>
+        <input class="form-input" type="time" id="log-end" value="17:00">
+      </div>
+    </div>
+    <div id="log-calc" style="font-size:14px;color:var(--text2);margin-bottom:14px;text-align:center"></div>
+    ` : `
+    <div class="form-group">
+      <label class="form-label" for="log-manual">סה"כ שעות</label>
+      <input class="form-input" type="number" id="log-manual" placeholder="למשל 8.5" step="0.25" min="0" max="24">
+    </div>
+    `}
+
+    <div class="form-group">
+      <label class="form-label" for="log-notes">הערות (אופציונלי)</label>
+      <textarea class="form-input" id="log-notes" placeholder="פרויקט, לקוח, הערה..."></textarea>
+    </div>
+
+    <button class="btn btn-success" onclick="saveLog()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      שמור רישום
+    </button>`;
+
+  // Live calculation
+  if (logState.mode === 'time') {
+    const calcEl = () => {
+      const s = document.getElementById('log-start');
+      const e = document.getElementById('log-end');
+      const calc = document.getElementById('log-calc');
+      if (s && e && calc) {
+        const h = calcHours(s.value, e.value);
+        calc.textContent = h > 0 ? `סה"כ: ${fmtHoursFull(h)}` : '';
+      }
+    };
+    setTimeout(() => {
+      const s = document.getElementById('log-start');
+      const e = document.getElementById('log-end');
+      if (s) s.addEventListener('change', calcEl);
+      if (e) e.addEventListener('change', calcEl);
+      calcEl();
+    }, 0);
+  }
+}
+
+function saveLog() {
+  const date = document.getElementById('log-date')?.value;
+  const notes = document.getElementById('log-notes')?.value || '';
+
+  let totalHours = 0, startTime = '', endTime = '';
+
+  if (logState.mode === 'time') {
+    startTime = document.getElementById('log-start')?.value || '08:00';
+    endTime = document.getElementById('log-end')?.value || '17:00';
+    totalHours = calcHours(startTime, endTime);
+    if (totalHours <= 0) { alert('שעת היציאה חייבת להיות אחרי שעת הכניסה'); return; }
+  } else {
+    totalHours = parseFloat(document.getElementById('log-manual')?.value);
+    if (!totalHours || totalHours <= 0) { alert('הכנס מספר שעות חוקי'); return; }
+  }
+
+  const log = {
+    id: uid(),
+    jobId: logState.jobId,
+    date,
+    startTime,
+    endTime,
+    totalHours,
+    notes
+  };
+
+  DB.logs.add(log);
+  showToast('נשמר בהצלחה! ✓');
+  Router.go('home');
+}
+
+// ============================================================
+// UI — HISTORY SCREEN
+// ============================================================
+let historyView = 'month'; // 'day' | 'week' | 'month'
+let historyDate = todayStr();
+
+function renderHistory() {
+  const el = document.getElementById('history-content');
+
+  const segHtml = `<div class="seg-ctrl">
+    <button class="seg-btn ${historyView==='day'?'active':''}" onclick="historyView='day';renderHistory()">יום</button>
+    <button class="seg-btn ${historyView==='week'?'active':''}" onclick="historyView='week';renderHistory()">שבוע</button>
+    <button class="seg-btn ${historyView==='month'?'active':''}" onclick="historyView='month';renderHistory()">חודש</button>
+  </div>`;
+
+  let content = '';
+
+  if (historyView === 'day') {
+    content = renderHistoryDay();
+  } else if (historyView === 'week') {
+    content = renderHistoryWeek();
+  } else {
+    content = renderHistoryMonth();
+  }
+
+  el.innerHTML = segHtml + content;
+}
+
+function renderHistoryDay() {
+  const today = historyDate;
+  const logs = DB.logs.forDate(today);
+  const jobs = DB.jobs.all();
+
+  const navHtml = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <button class="btn btn-secondary btn-sm" onclick="historyDate=prevDay(historyDate);renderHistory()">◀ אתמול</button>
+    <span style="font-size:14px;font-weight:600">${fmtDate(today)}</span>
+    <button class="btn btn-secondary btn-sm" onclick="historyDate=nextDay(historyDate);renderHistory()">היום ▶</button>
+  </div>`;
+
+  if (logs.length === 0) return navHtml + `<div class="empty"><div class="empty-icon">📭</div><h3>אין רישומים</h3></div>`;
+
+  const totalH = logs.reduce((s, l) => s + (l.totalHours || 0), 0);
+  return navHtml + logs.map(l => logItem(l, jobs)).join('') +
+    `<div class="card" style="text-align:center">סה"כ: <strong>${fmtHoursFull(totalH)}</strong></div>`;
+}
+
+function renderHistoryWeek() {
+  const weekStart = getWeekStart(historyDate);
+  const logs = DB.logs.forWeek(weekStart);
+  const jobs = DB.jobs.all();
+
+  const ws = new Date(weekStart + 'T12:00:00');
+  const we = new Date(ws); we.setDate(we.getDate() + 6);
+  const label = `${ws.getDate()}/${ws.getMonth()+1} — ${we.getDate()}/${we.getMonth()+1}`;
+
+  const navHtml = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <button class="btn btn-secondary btn-sm" onclick="historyDate=prevWeek(historyDate);renderHistory()">◀ שבוע קודם</button>
+    <span style="font-size:14px;font-weight:600">${label}</span>
+    <button class="btn btn-secondary btn-sm" onclick="historyDate=nextWeek(historyDate);renderHistory()">הבא ▶</button>
+  </div>`;
+
+  // Bar chart
+  const maxH = Math.max(...Array.from({length:7}, (_,i) => {
+    const d = new Date(ws); d.setDate(d.getDate() + i);
+    const ds = d.toISOString().split('T')[0];
+    return DB.logs.forDate(ds).reduce((s,l) => s + (l.totalHours||0), 0);
+  }), 1);
+
+  const bars = Array.from({length:7}, (_,i) => {
+    const d = new Date(ws); d.setDate(d.getDate() + i);
+    const ds = d.toISOString().split('T')[0];
+    const h = DB.logs.forDate(ds).reduce((s,l) => s + (l.totalHours||0), 0);
+    const pct = Math.round((h / maxH) * 100);
+    const isToday = ds === todayStr();
+    return `<div class="week-day">
+      <div class="wd-name">${DAYS_HE[d.getDay()]}</div>
+      <div class="wd-bar-wrap">
+        <div class="wd-bar" style="height:${pct}%;background:${isToday?'var(--accent)':'var(--surface2)'}"></div>
+      </div>
+      <div class="wd-h">${h > 0 ? fmtHours(h) : ''}</div>
+    </div>`;
+  }).join('');
+
+  const totalH = logs.reduce((s, l) => s + (l.totalHours || 0), 0);
+
+  if (logs.length === 0) return navHtml + `<div class="card"><div class="week-grid">${bars}</div></div><div class="empty"><div class="empty-icon">📭</div><h3>אין רישומים השבוע</h3></div>`;
+
+  return navHtml + `<div class="card"><div class="week-grid">${bars}</div>
+    <div style="text-align:center;font-size:13px;color:var(--text2)">סה"כ: <strong style="color:var(--text)">${fmtHoursFull(totalH)}</strong></div>
+  </div>` + logs.sort((a,b)=>b.date.localeCompare(a.date)).map(l => logItem(l, jobs)).join('');
+}
+
+function renderHistoryMonth() {
+  const now = new Date(historyDate + 'T12:00:00');
+  const y = now.getFullYear(), m = now.getMonth();
+  const logs = DB.logs.forMonth(y, m);
+  const jobs = DB.jobs.all();
+
+  const navHtml = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <button class="btn btn-secondary btn-sm" onclick="historyDate=prevMonth(historyDate);renderHistory()">◀ קודם</button>
+    <span style="font-size:15px;font-weight:700">${MONTHS_HE[m]} ${y}</span>
+    <button class="btn btn-secondary btn-sm" onclick="historyDate=nextMonth(historyDate);renderHistory()">הבא ▶</button>
+  </div>`;
+
+  const exportBtn = `<button class="btn btn-secondary" style="margin-bottom:12px" onclick="printMonthReport(${y},${m})">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+    יצא דוח PDF
+  </button>`;
+
+  if (logs.length === 0) return navHtml + exportBtn + `<div class="empty"><div class="empty-icon">📭</div><h3>אין רישומים החודש</h3></div>`;
+
+  const totalH = logs.reduce((s, l) => s + (l.totalHours || 0), 0);
+  const workDays = [...new Set(logs.map(l=>l.date))].length;
+
+  // Summary per job
+  const jobSummary = jobs.map(j => {
+    const jLogs = logs.filter(l => l.jobId === j.id);
+    if (jLogs.length === 0) return '';
+    const h = jLogs.reduce((s, l) => s + (l.totalHours || 0), 0);
+    const p = Prediction.estimate(j.id);
+    return `<div class="comp-row">
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${j.color};margin-left:6px"></span>${j.name}</span>
+      <span><strong>${fmtHoursFull(h)}</strong>${p&&p.netExpected>0 ? ' | ' + fmtMoney(p.netExpected) : ''}</span>
+    </div>`;
+  }).join('');
+
+  const summaryCard = `<div class="card">
+    <div class="card-title">סיכום חודש</div>
+    <div style="display:flex;gap:16px;margin-bottom:12px">
+      <div><div style="font-size:22px;font-weight:700">${fmtHours(totalH)}</div><div style="font-size:12px;color:var(--text2)">שעות</div></div>
+      <div><div style="font-size:22px;font-weight:700">${workDays}</div><div style="font-size:12px;color:var(--text2)">ימי עבודה</div></div>
+    </div>
+    ${jobSummary}
+  </div>`;
+
+  const sorted = [...logs].sort((a,b) => b.date.localeCompare(a.date));
+  return navHtml + exportBtn + summaryCard + sorted.map(l => logItem(l, jobs)).join('');
+}
+
+function logItem(l, jobs) {
+  const job = jobs.find(j => j.id === l.jobId);
+  const timeStr = l.startTime && l.endTime ? `${l.startTime}–${l.endTime}` : '';
+  return `<div class="list-item" style="flex-direction:column;align-items:stretch;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="job-dot" style="background:${job?.color||'#888'}"></div>
+      <div class="list-item-body">
+        <div class="list-item-title">${fmtDate(l.date)}</div>
+        <div class="list-item-sub">${job?.name||'?'}${timeStr?' · '+timeStr:''}</div>
+      </div>
+      <div class="list-item-right">
+        <div class="list-item-value">${fmtHours(l.totalHours)}<span style="font-size:12px;color:var(--text2)"> שע'</span></div>
+      </div>
+    </div>
+    ${l.notes ? `<div style="font-size:13px;color:var(--text2);padding-right:22px">${l.notes}</div>` : ''}
+    <div style="display:flex;gap:8px;padding-right:22px">
+      <button class="btn btn-secondary btn-sm" onclick="editLog('${l.id}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        ערוך
+      </button>
+      <button class="del-btn" style="margin-right:auto" onclick="deleteLog('${l.id}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        מחק
+      </button>
+    </div>
+  </div>`;
+}
+
+function editLog(id) {
+  const l = DB.logs.all().find(x => x.id === id);
+  if (!l) return;
+  const jobs = DB.jobs.all();
+  const isTime = !!(l.startTime && l.endTime);
+
+  const jobOptions = jobs.map(j =>
+    `<option value="${j.id}" ${j.id===l.jobId?'selected':''}>${j.name}</option>`).join('');
+
+  Sheet.open('ערוך רישום', `
+    <form id="edit-log-form">
+      <div class="form-group">
+        <label class="form-label">מקום עבודה</label>
+        <select class="form-input" name="jobId">${jobOptions}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">תאריך</label>
+        <input class="form-input" type="date" name="date" value="${l.date}">
+      </div>
+      <div class="seg-ctrl" id="edit-mode-seg">
+        <button type="button" class="seg-btn ${isTime?'active':''}" onclick="switchEditMode('time',this)">שעת כניסה/יציאה</button>
+        <button type="button" class="seg-btn ${!isTime?'active':''}" onclick="switchEditMode('manual',this)">ידני</button>
+      </div>
+      <div id="edit-time-fields" style="${isTime?'':'display:none'}">
+        <div class="time-row">
+          <div class="form-group">
+            <label class="form-label">כניסה</label>
+            <input class="form-input" type="time" name="startTime" value="${l.startTime||'08:00'}">
+          </div>
+          <div style="padding-bottom:12px;color:var(--text2);font-size:20px">—</div>
+          <div class="form-group">
+            <label class="form-label">יציאה</label>
+            <input class="form-input" type="time" name="endTime" value="${l.endTime||'17:00'}">
+          </div>
+        </div>
+        <div id="edit-calc" style="font-size:14px;color:var(--text2);margin-bottom:14px;text-align:center"></div>
+      </div>
+      <div id="edit-manual-fields" style="${!isTime?'':'display:none'}">
+        <div class="form-group">
+          <label class="form-label">סה"כ שעות</label>
+          <input class="form-input" type="number" name="totalHoursManual" value="${!isTime?l.totalHours:''}" step="0.25" min="0" max="24">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">הערות</label>
+        <textarea class="form-input" name="notes">${l.notes||''}</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">שמור שינויים</button>
+    </form>`, form => {
+    const fd = new FormData(form);
+    const isTimeSel = document.getElementById('edit-time-fields').style.display !== 'none';
+    let totalHours, startTime = '', endTime = '';
+    if (isTimeSel) {
+      startTime = fd.get('startTime');
+      endTime = fd.get('endTime');
+      totalHours = calcHours(startTime, endTime);
+      if (totalHours <= 0) { alert('שעת היציאה חייבת להיות אחרי שעת הכניסה'); return; }
+    } else {
+      totalHours = parseFloat(fd.get('totalHoursManual'));
+      if (!totalHours || totalHours <= 0) { alert('הכנס מספר שעות חוקי'); return; }
+    }
+    DB.logs.update({ ...l, jobId: fd.get('jobId'), date: fd.get('date'), startTime, endTime, totalHours, notes: fd.get('notes') });
+    Sheet.close();
+    showToast('עודכן ✓');
+    renderHistory();
+  });
+
+  // Live calc for edit sheet
+  setTimeout(() => {
+    const calcEl = () => {
+      const s = document.querySelector('#edit-log-form [name="startTime"]');
+      const e = document.querySelector('#edit-log-form [name="endTime"]');
+      const calc = document.getElementById('edit-calc');
+      if (s && e && calc) {
+        const h = calcHours(s.value, e.value);
+        calc.textContent = h > 0 ? `סה"כ: ${fmtHoursFull(h)}` : '';
+      }
+    };
+    document.querySelector('#edit-log-form [name="startTime"]')?.addEventListener('change', calcEl);
+    document.querySelector('#edit-log-form [name="endTime"]')?.addEventListener('change', calcEl);
+    calcEl();
+  }, 0);
+}
+
+function switchEditMode(mode, btn) {
+  document.querySelectorAll('#edit-mode-seg .seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('edit-time-fields').style.display = mode === 'time' ? '' : 'none';
+  document.getElementById('edit-manual-fields').style.display = mode === 'manual' ? '' : 'none';
+}
+
+function deleteLog(id) {
+  if (!confirm('למחוק את הרישום?')) return;
+  DB.logs.del(id);
+  renderHistory();
+}
+
+// Date navigation helpers
+function prevDay(d) { const dt = new Date(d+'T12:00:00'); dt.setDate(dt.getDate()-1); return dt.toISOString().split('T')[0]; }
+function nextDay(d) { const dt = new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+1); return dt.toISOString().split('T')[0]; }
+function prevWeek(d) { const dt = new Date(d+'T12:00:00'); dt.setDate(dt.getDate()-7); return dt.toISOString().split('T')[0]; }
+function nextWeek(d) { const dt = new Date(d+'T12:00:00'); dt.setDate(dt.getDate()+7); return dt.toISOString().split('T')[0]; }
+function prevMonth(d) { const dt = new Date(d+'T12:00:00'); dt.setMonth(dt.getMonth()-1); return dt.toISOString().split('T')[0]; }
+function nextMonth(d) { const dt = new Date(d+'T12:00:00'); dt.setMonth(dt.getMonth()+1); return dt.toISOString().split('T')[0]; }
+
+// ============================================================
+// UI — SETTINGS SCREEN
+// ============================================================
+function renderSettings() {
+  const el = document.getElementById('settings-content');
+  const jobs = DB.jobs.all();
+  const payslips = DB.payslips.all();
+  const settings = DB.settings.get();
+
+  // Jobs section
+  const jobsHtml = jobs.length === 0
+    ? `<div style="color:var(--text2);font-size:14px;padding:8px 0">אין מקומות עבודה עדיין</div>`
+    : jobs.map(j => `
+      <div class="list-item">
+        <div class="job-dot" style="background:${j.color}"></div>
+        <div class="list-item-body">
+          <div class="list-item-title">${j.name}</div>
+          <div class="list-item-sub">${j.type==='freelance'?'עצמאי':'שכיר'}${j.hourlyRate?' · ₪'+j.hourlyRate+'/שע':''}${j.travelAllowance?' · נסיעות ₪'+j.travelAllowance:''}</div>
+        </div>
+        <div class="list-item-right" style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="showEditJob('${j.id}')">ערוך</button>
+          <button class="del-btn" onclick="deleteJob('${j.id}')">מחק</button>
+        </div>
+      </div>`).join('');
+
+  // Payslips section
+  const payslipsHtml = payslips.length === 0
+    ? `<div style="color:var(--text2);font-size:14px;padding:8px 0">אין תלושים עדיין</div>`
+    : payslips.slice().reverse().map(p => {
+      const job = DB.jobs.find(p.jobId);
+      return `<div class="list-item">
+        <div class="list-item-body">
+          <div class="list-item-title">${MONTHS_HE[p.month]} ${p.year}${job?' · '+job.name:''}</div>
+          <div class="list-item-sub">ברוטו ${fmtMoney(p.grossAmount)} | נטו ${fmtMoney(p.netAmount)}${p.hoursWorked?' | '+p.hoursWorked+' שע׳':''}</div>
+        </div>
+        <div>
+          <button class="del-btn" onclick="deletePayslip('${p.id}')">מחק</button>
+        </div>
+      </div>`;
+    }).join('');
+
+  // Reminder days
+  const dayLabels = ['א','ב','ג','ד','ה','ו','ש'];
+  const dayChips = dayLabels.map((d, i) => `
+    <button class="day-chip ${settings.reminderDays.includes(i)?'active':''}"
+      onclick="toggleReminderDay(${i})">${d}</button>`).join('');
+
+  el.innerHTML = `
+    <!-- JOBS -->
+    <div class="section-hdr">
+      <h2>מקומות עבודה</h2>
+      <button class="add-btn" onclick="showAddJob()">+ הוסף</button>
+    </div>
+    ${jobsHtml}
+
+    <div class="divider"></div>
+
+    <!-- PAYSLIPS -->
+    <div class="section-hdr" style="margin-top:16px">
+      <h2>תלושי שכר היסטוריים</h2>
+      <button class="add-btn" onclick="showAddPayslip()">+ הוסף</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:10px">
+      התלושים משמשים לחיזוי משכורת עתידית
+    </div>
+    ${payslipsHtml}
+
+    <div class="divider"></div>
+
+    <!-- REMINDERS -->
+    <div style="margin-top:16px">
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">תזכורות</h2>
+      <div class="card">
+        <div class="toggle-row" style="margin-bottom:14px">
+          <span class="toggle-label">הפעל תזכורות</span>
+          <label class="toggle">
+            <input type="checkbox" ${settings.reminderEnabled?'checked':''} onchange="toggleReminder(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-group" style="${settings.reminderEnabled?'':'opacity:0.4;pointer-events:none'}">
+          <label class="form-label">שעת תזכורת</label>
+          <input class="form-input" type="time" value="${settings.reminderTime}" onchange="setReminderTime(this.value)" ${settings.reminderEnabled?'':'disabled'}>
+        </div>
+        <div style="${settings.reminderEnabled?'':'opacity:0.4;pointer-events:none'}">
+          <div class="form-label" style="margin-bottom:8px">ימי תזכורת</div>
+          <div class="day-chips">${dayChips}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// SETTINGS — JOBS
+// ============================================================
+function showAddJob() {
+  const colors = JOB_COLORS();
+  Sheet.open('הוסף מקום עבודה', `
+    <form id="job-form">
+      <div class="form-group">
+        <label class="form-label">שם מקום העבודה</label>
+        <input class="form-input" name="name" placeholder="למשל: חברת אלפא" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">סוג העסקה</label>
+        <select class="form-input" name="type">
+          <option value="employee">שכיר</option>
+          <option value="freelance">עצמאי / פרילנס</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">שכר שעתי (₪)</label>
+        <input class="form-input" name="hourlyRate" type="number" placeholder="למשל 50" step="0.5" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">דמי נסיעות ליום (₪)</label>
+        <input class="form-input" name="travelAllowance" type="number" placeholder="למשל 23.40" step="0.1" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">צבע</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${colors.map((c,i) => `<label style="cursor:pointer">
+            <input type="radio" name="color" value="${c}" ${i===0?'checked':''} style="display:none">
+            <div style="width:32px;height:32px;border-radius:50%;background:${c};border:3px solid transparent;transition:border-color 0.15s"
+              onclick="this.parentElement.querySelector('input').checked=true;document.querySelectorAll('[data-csel]').forEach(e=>e.style.borderColor='transparent');this.style.borderColor='#fff'" data-csel></div>
+          </label>`).join('')}
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">שמור</button>
+    </form>`, form => {
+    const fd = new FormData(form);
+    const colorInputs = form.querySelectorAll('input[name="color"]');
+    const selectedColor = [...colorInputs].find(r => r.checked)?.value || '#3B82F6';
+    DB.jobs.add({
+      id: uid(),
+      name: fd.get('name'),
+      type: fd.get('type'),
+      hourlyRate: parseFloat(fd.get('hourlyRate')) || 0,
+      travelAllowance: parseFloat(fd.get('travelAllowance')) || 0,
+      color: selectedColor
+    });
+    Sheet.close();
+    renderSettings();
+    showToast('מקום עבודה נוסף ✓');
+  });
+}
+
+function showEditJob(jobId) {
+  const job = DB.jobs.find(jobId);
+  if (!job) return;
+  const colors = JOB_COLORS();
+  Sheet.open('ערוך מקום עבודה', `
+    <form id="job-form">
+      <div class="form-group">
+        <label class="form-label">שם מקום העבודה</label>
+        <input class="form-input" name="name" value="${job.name}" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">סוג העסקה</label>
+        <select class="form-input" name="type">
+          <option value="employee" ${job.type==='employee'?'selected':''}>שכיר</option>
+          <option value="freelance" ${job.type==='freelance'?'selected':''}>עצמאי / פרילנס</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">שכר שעתי (₪)</label>
+        <input class="form-input" name="hourlyRate" type="number" value="${job.hourlyRate||''}" step="0.5" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">דמי נסיעות ליום (₪)</label>
+        <input class="form-input" name="travelAllowance" type="number" value="${job.travelAllowance||''}" step="0.1" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">צבע</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${colors.map(c => `<label style="cursor:pointer">
+            <input type="radio" name="color" value="${c}" ${c===job.color?'checked':''} style="display:none">
+            <div style="width:32px;height:32px;border-radius:50%;background:${c};border:3px solid ${c===job.color?'#fff':'transparent'};transition:border-color 0.15s"
+              onclick="document.querySelectorAll('[data-csel]').forEach(e=>e.style.borderColor='transparent');this.style.borderColor='#fff'" data-csel></div>
+          </label>`).join('')}
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">שמור שינויים</button>
+    </form>`, form => {
+    const fd = new FormData(form);
+    const colorInputs = form.querySelectorAll('input[name="color"]');
+    const selectedColor = [...colorInputs].find(r => r.checked)?.value || job.color;
+    DB.jobs.update({
+      ...job,
+      name: fd.get('name'),
+      type: fd.get('type'),
+      hourlyRate: parseFloat(fd.get('hourlyRate')) || 0,
+      travelAllowance: parseFloat(fd.get('travelAllowance')) || 0,
+      color: selectedColor
+    });
+    Sheet.close();
+    renderSettings();
+    showToast('עודכן ✓');
+  });
+}
+
+function deleteJob(id) {
+  if (!confirm('למחוק את מקום העבודה? הרישומים הקשורים לא יימחקו.')) return;
+  DB.jobs.del(id);
+  renderSettings();
+}
+
+// ============================================================
+// SETTINGS — PAYSLIPS
+// ============================================================
+function showAddPayslip() {
+  const jobs = DB.jobs.all();
+  if (jobs.length === 0) { alert('הוסף מקום עבודה קודם'); return; }
+
+  const now = new Date();
+  const monthOptions = MONTHS_HE.map((m, i) =>
+    `<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('');
+  const jobOptions = jobs.map(j =>
+    `<option value="${j.id}">${j.name}</option>`).join('');
+
+  Sheet.open('הוסף תלוש שכר', `
+    <div id="pdf-upload-area" style="margin-bottom:16px">
+      <label style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;border:2px dashed var(--border);border-radius:12px;cursor:pointer;background:var(--surface2)">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+        <span style="font-size:15px;font-weight:600;color:var(--accent)">העלה תלוש PDF</span>
+        <span style="font-size:12px;color:var(--text2)">לחץ לבחירת קובץ מהטלפון / מחשב</span>
+        <input type="file" accept=".pdf,application/pdf" id="pdf-file-input" style="display:none" onchange="extractPayslipFromPDF(this)">
+      </label>
+      <div id="pdf-status" style="margin-top:8px;font-size:13px;color:var(--text2);text-align:center"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;color:var(--text2);font-size:13px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span>או הכנס ידנית</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+    <form id="payslip-form">
+      <div class="form-group">
+        <label class="form-label">מקום עבודה</label>
+        <select class="form-input" name="jobId">${jobOptions}</select>
+      </div>
+      <div class="time-row">
+        <div class="form-group">
+          <label class="form-label">חודש</label>
+          <select class="form-input" name="month">${monthOptions}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">שנה</label>
+          <input class="form-input" name="year" type="number" value="${now.getFullYear()}" min="2000" max="2099">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">שכר ברוטו (₪)</label>
+        <input class="form-input" name="grossAmount" type="number" placeholder="לפני ניכויים" required min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">שכר נטו (₪)</label>
+        <input class="form-input" name="netAmount" type="number" placeholder="לאחר ניכויים" required min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">שעות עבודה (אופציונלי)</label>
+        <input class="form-input" name="hoursWorked" type="number" placeholder="למשל 176" min="0">
+      </div>
+      <button type="submit" class="btn btn-primary">שמור תלוש</button>
+    </form>`, form => {
+    const fd = new FormData(form);
+    DB.payslips.add({
+      id: uid(),
+      jobId: fd.get('jobId'),
+      month: parseInt(fd.get('month')),
+      year: parseInt(fd.get('year')),
+      grossAmount: parseFloat(fd.get('grossAmount')) || 0,
+      netAmount: parseFloat(fd.get('netAmount')) || 0,
+      hoursWorked: parseFloat(fd.get('hoursWorked')) || 0
+    });
+    Sheet.close();
+    renderSettings();
+    showToast('תלוש נוסף ✓');
+  });
+}
+
+// ============================================================
+// PDF PAYSLIP EXTRACTION
+// ============================================================
+async function extractPayslipFromPDF(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('pdf-status');
+  statusEl.textContent = 'טוען PDF...';
+
+  try {
+    // Lazy-load PDF.js
+    if (!window.pdfjsLib) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      fullText += content.items.map(item => item.str).join(' ') + '\n';
+    }
+
+    statusEl.textContent = 'מנתח נתונים...';
+
+    // Extract numbers — remove commas from thousands separator
+    const parseNum = str => parseFloat(str.replace(/,/g, ''));
+
+    // Gross — look for ברוטו / שכר ברוטו / סה"כ ברוטו
+    const grossPatterns = [
+      /סה["\u05b4]?["\u05bc]?כ\s*ברוטו[^0-9]*([\d,]+)/,
+      /שכר\s*ברוטו[^0-9]*([\d,]+)/,
+      /ברוטו[^0-9]*([\d,]+)/
+    ];
+    let gross = null;
+    for (const p of grossPatterns) {
+      const m = fullText.match(p);
+      if (m) { gross = parseNum(m[1]); break; }
+    }
+
+    // Net — look for לתשלום / נטו / סה"כ לתשלום
+    const netPatterns = [
+      /סה["\u05b4]?["\u05bc]?כ\s*לתשלום[^0-9]*([\d,]+)/,
+      /לתשלום[^0-9]*([\d,]+)/,
+      /נטו[^0-9]*([\d,]+)/
+    ];
+    let net = null;
+    for (const p of netPatterns) {
+      const m = fullText.match(p);
+      if (m) { net = parseNum(m[1]); break; }
+    }
+
+    // Hours
+    const hoursM = fullText.match(/(?:שעות\s*עבודה|שעות\s*נוכחות|שעות)[^0-9]*([\d.]+)/);
+    const hours = hoursM ? parseFloat(hoursM[1]) : null;
+
+    // Month — search for Hebrew month names
+    let month = null;
+    for (let i = 0; i < MONTHS_HE.length; i++) {
+      if (fullText.includes(MONTHS_HE[i])) { month = i; break; }
+    }
+
+    // Year
+    const yearM = fullText.match(/20(2[0-9])/);
+    const year = yearM ? parseInt('20' + yearM[1]) : null;
+
+    // Fill form fields
+    let found = [];
+    const setField = (name, val, label) => {
+      const el = document.querySelector(`#payslip-form [name="${name}"]`);
+      if (el && val !== null && val > 0) {
+        el.value = val;
+        el.style.borderColor = 'var(--green)';
+        found.push(label);
+      }
+    };
+
+    if (month !== null) {
+      const sel = document.querySelector('#payslip-form [name="month"]');
+      if (sel) { sel.value = month; sel.style.borderColor = 'var(--green)'; found.push('חודש'); }
+    }
+    if (year) {
+      const el = document.querySelector('#payslip-form [name="year"]');
+      if (el) { el.value = year; el.style.borderColor = 'var(--green)'; found.push('שנה'); }
+    }
+    setField('grossAmount', gross, 'ברוטו');
+    setField('netAmount', net, 'נטו');
+    setField('hoursWorked', hours, 'שעות');
+
+    if (found.length > 0) {
+      statusEl.innerHTML = `<span style="color:var(--green)">✓ זוהו: ${found.join(', ')}</span><br><span style="color:var(--text2)">בדוק ותקן לפי הצורך</span>`;
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--yellow)">לא הצלחתי לזהות נתונים — הכנס ידנית</span>`;
+    }
+  } catch (err) {
+    statusEl.innerHTML = `<span style="color:var(--red)">שגיאה בטעינת PDF — הכנס ידנית</span>`;
+  }
+}
+
+// ============================================================
+// PREDICTION DETAIL
+// ============================================================
+function showPredictionDetail(jobId) {
+  const job = DB.jobs.find(jobId);
+  if (!job) return;
+
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+
+  const logs = DB.logs.forMonth(y, m).filter(l => l.jobId === jobId);
+  const totalHours = logs.reduce((s, l) => s + (l.totalHours || 0), 0);
+  const workDays = logs.length;
+
+  const hoursWage = totalHours * (job.hourlyRate || 0);
+  const travelWage = workDays * (job.travelAllowance || 0);
+  const grossExpected = hoursWage + travelWage;
+
+  const payslips = DB.payslips.forJob(jobId).filter(p => p.grossAmount > 0);
+  const netRatio = payslips.length > 0
+    ? payslips.reduce((s, p) => s + (p.netAmount / p.grossAmount), 0) / payslips.length
+    : 0.72;
+
+  const netExpected = grossExpected * netRatio;
+  const projectedNet = dayOfMonth > 0 ? (netExpected / dayOfMonth) * daysInMonth : netExpected;
+
+  const ratioSource = payslips.length > 0
+    ? `ממוצע מ-${payslips.length} תלושים`
+    : 'ברירת מחדל (אין תלושים)';
+
+  const row = (label, val, sub) => `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:14px;font-weight:500">${label}</div>
+        ${sub ? `<div style="font-size:12px;color:var(--text2);margin-top:2px">${sub}</div>` : ''}
+      </div>
+      <div style="font-size:15px;font-weight:700;color:var(--accent)">${val}</div>
+    </div>`;
+
+  Sheet.open(`חישוב תחזית — ${job.name}`, `
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">${MONTHS_HE[m]} ${y} | ${dayOfMonth} מתוך ${daysInMonth} ימים</div>
+
+    ${row('שעות × שכר שעתי',
+      fmtMoney(hoursWage),
+      `${fmtHours(totalHours)} שעות × ${fmtMoney(job.hourlyRate)}/שעה`
+    )}
+    ${row('דמי נסיעות',
+      fmtMoney(travelWage),
+      `${workDays} ימים × ${fmtMoney(job.travelAllowance)}/יום`
+    )}
+    ${row('סה"כ ברוטו (עד היום)',
+      fmtMoney(grossExpected),
+      'שכר + נסיעות'
+    )}
+
+    <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between">
+        <div>
+          <div style="font-size:14px;font-weight:500">יחס נטו/ברוטו</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">${ratioSource}</div>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:var(--accent)">${Math.round(netRatio * 100)}%</div>
+      </div>
+    </div>
+
+    ${row('נטו עד היום', fmtMoney(netExpected), `${fmtMoney(grossExpected)} × ${Math.round(netRatio*100)}%`)}
+
+    <div style="margin-top:14px;padding:14px;background:rgba(52,199,89,0.1);border-radius:12px;border:1px solid rgba(52,199,89,0.3)">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:4px">תחזית לסוף החודש</div>
+      <div style="font-size:28px;font-weight:700;color:var(--green)">${fmtMoney(projectedNet)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">
+        (קצב נוכחי × ${daysInMonth} ימים ÷ ${dayOfMonth} ימים שעברו)
+      </div>
+    </div>
+  `);
+}
+
+// ============================================================
+// PDF REPORT
+// ============================================================
+function printMonthReport(year, month) {
+  const logs = DB.logs.forMonth(year, month).sort((a,b) => a.date.localeCompare(b.date));
+  const jobs = DB.jobs.all();
+  const monthName = `${MONTHS_HE[month]} ${year}`;
+
+  // Build per-job summaries
+  const jobSummaries = jobs.map(j => {
+    const jLogs = logs.filter(l => l.jobId === j.id);
+    if (jLogs.length === 0) return null;
+    const totalH = jLogs.reduce((s,l) => s+(l.totalHours||0), 0);
+    const workDays = jLogs.length;
+    const p = Prediction.estimate(j.id);
+    return { job: j, logs: jLogs, totalH, workDays, p };
+  }).filter(Boolean);
+
+  const tableRows = logs.map(l => {
+    const job = jobs.find(j => j.id === l.jobId);
+    const dayName = DAYS_FULL[new Date(l.date+'T12:00:00').getDay()];
+    const d = new Date(l.date+'T12:00:00');
+    return `<tr>
+      <td>${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}</td>
+      <td>${dayName}</td>
+      <td>${job?.name || '—'}</td>
+      <td>${l.startTime||'—'}</td>
+      <td>${l.endTime||'—'}</td>
+      <td><strong>${fmtHours(l.totalHours)}</strong></td>
+      <td>${l.notes||''}</td>
+    </tr>`;
+  }).join('');
+
+  const totalHours = logs.reduce((s,l) => s+(l.totalHours||0), 0);
+  const workDays = [...new Set(logs.map(l=>l.date))].length;
+
+  const summaryRows = jobSummaries.map(({job, totalH, workDays: wd, p}) => `
+    <tr>
+      <td><strong>${job.name}</strong></td>
+      <td>${job.type==='freelance'?'עצמאי':'שכיר'}</td>
+      <td>${wd} ימים</td>
+      <td>${fmtHours(totalH)} שעות</td>
+      <td>${p&&p.netExpected>0 ? fmtMoney(p.grossExpected) : '—'}</td>
+      <td>${p&&p.netExpected>0 ? fmtMoney(p.netExpected) : '—'}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<title>דוח שעות עבודה — ${monthName}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Arial', sans-serif;
+    font-size: 13px;
+    color: #111;
+    direction: rtl;
+    padding: 30px;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #555; margin-bottom: 24px; font-size: 13px; }
+  h2 { font-size: 15px; margin: 20px 0 8px; border-bottom: 2px solid #3B82F6; padding-bottom: 4px; color: #1a1a1a; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  th {
+    background: #1c3d5a;
+    color: #fff;
+    padding: 8px 10px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  td { padding: 7px 10px; border-bottom: 1px solid #e5e5e5; }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  tr:last-child td { border-bottom: none; }
+  .total-row td { font-weight: 700; background: #eef2ff; border-top: 2px solid #3B82F6; }
+  .footer { margin-top: 30px; font-size: 11px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
+  .meta { display: flex; gap: 30px; margin-bottom: 20px; }
+  .meta-item { }
+  .meta-item .label { font-size: 11px; color: #888; }
+  .meta-item .value { font-size: 16px; font-weight: 700; }
+  @media print {
+    body { padding: 20px; }
+    button { display: none; }
+  }
+</style>
+</head>
+<body>
+<h1>דוח שעות עבודה</h1>
+<div class="subtitle">חודש: ${monthName} | הופק: ${new Date().toLocaleDateString('he-IL')}</div>
+
+<div class="meta">
+  <div class="meta-item">
+    <div class="label">סה"כ שעות</div>
+    <div class="value">${fmtHoursFull(totalHours)}</div>
+  </div>
+  <div class="meta-item">
+    <div class="label">ימי עבודה</div>
+    <div class="value">${workDays}</div>
+  </div>
+</div>
+
+<h2>פירוט יומי</h2>
+<table>
+  <thead>
+    <tr>
+      <th>תאריך</th>
+      <th>יום</th>
+      <th>מקום עבודה</th>
+      <th>כניסה</th>
+      <th>יציאה</th>
+      <th>שעות</th>
+      <th>הערות</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${tableRows}
+    <tr class="total-row">
+      <td colspan="5">סה"כ</td>
+      <td>${fmtHours(totalHours)} שעות</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+${jobSummaries.length > 0 ? `
+<h2>סיכום לפי מקום עבודה</h2>
+<table>
+  <thead>
+    <tr>
+      <th>מקום עבודה</th>
+      <th>סוג</th>
+      <th>ימים</th>
+      <th>שעות</th>
+      <th>ברוטו צפוי</th>
+      <th>נטו צפוי</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${summaryRows}
+  </tbody>
+</table>` : ''}
+
+<div class="footer">
+  <p>הדוח הופק אוטומטית ע"י אפליקציית מעקב שעות עבודה</p>
+</div>
+
+<br>
+<button onclick="window.print()" style="padding:10px 24px;background:#3B82F6;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-family:inherit">
+  הדפס / שמור כ-PDF
+</button>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { alert('אפשר פתיחת חלונות קופצים בדפדפן'); return; }
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+}
+
+function deletePayslip(id) {
+  if (!confirm('למחוק את התלוש?')) return;
+  DB.payslips.del(id);
+  renderSettings();
+}
+
+// ============================================================
+// SETTINGS — REMINDERS
+// ============================================================
+function toggleReminder(enabled) {
+  const s = DB.settings.get();
+  s.reminderEnabled = enabled;
+  DB.settings.set(s);
+  if (enabled) requestNotificationPermission();
+  renderSettings();
+}
+
+function setReminderTime(time) {
+  const s = DB.settings.get();
+  s.reminderTime = time;
+  DB.settings.set(s);
+}
+
+function toggleReminderDay(dayIndex) {
+  const s = DB.settings.get();
+  const idx = s.reminderDays.indexOf(dayIndex);
+  if (idx >= 0) s.reminderDays.splice(idx, 1);
+  else s.reminderDays.push(dayIndex);
+  DB.settings.set(s);
+  renderSettings();
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') {
+    showToast('אפשר תזכורות בהגדרות הדפדפן');
+  }
+}
+
+// ============================================================
+// REMINDER CHECK (on app open)
+// ============================================================
+function checkReminder() {
+  const settings = DB.settings.get();
+  if (!settings.reminderEnabled) return;
+
+  const now = new Date();
+  const todayDay = now.getDay(); // 0=Sun
+  if (!settings.reminderDays.includes(todayDay)) return;
+
+  const [rh, rm] = settings.reminderTime.split(':').map(Number);
+  const reminderMins = rh * 60 + rm;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  if (nowMins < reminderMins) return;
+
+  const today = todayStr();
+  if (DB.logs.forDate(today).length > 0) return; // already logged
+
+  // Show notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('מעקב שעות עבודה', {
+      body: 'לא שכחת לרשום שעות היום?',
+      dir: 'rtl',
+      lang: 'he'
+    });
+  }
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = `
+      position:fixed;bottom:calc(var(--nav-h) + var(--safe-bottom) + 12px);
+      left:50%;transform:translateX(-50%);
+      background:#333;color:#fff;padding:10px 20px;
+      border-radius:20px;font-size:14px;z-index:500;
+      opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap
+    `;
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2000);
+}
+
+// ============================================================
+// UI RENDER DISPATCHER
+// ============================================================
+const UI = { render(s) {
+  if (s==='home') renderHome();
+  else if (s==='log') renderLog();
+  else if (s==='history') renderHistory();
+  else if (s==='settings') renderSettings();
+}};
+
+// ============================================================
+// APP INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+
+  // Nav clicks
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => Router.go(item.dataset.screen));
+  });
+
+  // Close sheet on overlay click
+  document.getElementById('overlay').addEventListener('click', Sheet.close);
+
+  // Reminder check
+  checkReminder();
+
+  // Initial render
+  Router.go('home');
+});
+</script>
+</body>
+</html>
